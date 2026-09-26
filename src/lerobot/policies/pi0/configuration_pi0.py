@@ -16,7 +16,13 @@
 
 from dataclasses import dataclass, field
 
-from lerobot.configs import FeatureType, NormalizationMode, PolicyFeature, PreTrainedConfig
+from lerobot.configs import (
+    FeatureType,
+    NormalizationMode,
+    PolicyFeature,
+    PreTrainedConfig,
+    RelativeActionsConfigMixin,
+)
 from lerobot.optim import AdamWConfig, CosineDecayWithWarmupSchedulerConfig
 from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE
 
@@ -27,7 +33,7 @@ DEFAULT_IMAGE_SIZE = 224
 
 @PreTrainedConfig.register_subclass("pi0")
 @dataclass
-class PI0Config(PreTrainedConfig):
+class PI0Config(RelativeActionsConfigMixin, PreTrainedConfig):
     paligemma_variant: str = "gemma_2b"
     action_expert_variant: str = "gemma_300m"
     dtype: str = "float32"  # Options: "bfloat16", "float32"
@@ -48,16 +54,6 @@ class PI0Config(PreTrainedConfig):
     time_sampling_offset: float = 0.001
     min_period: float = 4e-3
     max_period: float = 4.0
-
-    # Relative actions: converts absolute actions to relative (relative to state).
-    use_relative_actions: bool = False
-    # Joint names to exclude from relative (kept absolute). Empty list = all dims relative.
-    relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
-    # Populated at runtime from dataset metadata by make_policy.
-    action_feature_names: list[str] | None = None
-    # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
-    # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
-    relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
 
     # Real-Time Chunking (RTC) configuration
     rtc_config: RTCConfig | None = None

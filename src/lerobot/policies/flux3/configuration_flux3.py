@@ -25,7 +25,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from lerobot.configs.policies import PreTrainedConfig
+from lerobot.configs.policies import PreTrainedConfig, RelativeActionsConfigMixin
 from lerobot.configs.types import NormalizationMode
 from lerobot.optim.optimizers import AdamWConfig
 from lerobot.optim.schedulers import FrozenWarmupConstantSchedulerConfig
@@ -43,7 +43,7 @@ ATTN_MODES = ("torch", "flash", "cudnn")
 
 @PreTrainedConfig.register_subclass("flux3")
 @dataclass
-class Flux3Config(PreTrainedConfig):
+class Flux3Config(RelativeActionsConfigMixin, PreTrainedConfig):
     """FLUX 3 Action video-action policy: joint video + action denoising on the FLUX 3 trunk.
 
     Attributes:
@@ -127,13 +127,6 @@ class Flux3Config(PreTrainedConfig):
     # Packing applies this scale and inference divides it out; retain the checkpoint's value.
     action_scale: float = 2.0
     gripper_flip_dims: list[int] = field(default_factory=list)
-    use_relative_actions: bool = False
-    relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
-
-    # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
-    # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
-    relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
-    action_feature_names: list[str] | None = None
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
             "VISUAL": NormalizationMode.IDENTITY,
