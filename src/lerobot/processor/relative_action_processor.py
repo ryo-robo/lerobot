@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 import torch
 from torch import Tensor
 
-from lerobot.configs import PipelineFeatureType, PolicyFeature
+from lerobot.configs import PipelineFeatureType, PolicyFeature, RelativeActionsConfigMixin
 from lerobot.lerobot_types import EnvTransition, TransitionKey
 from lerobot.utils.constants import OBS_STATE
 from lerobot.utils.rotation import (
@@ -245,6 +245,22 @@ class RelativeActionsProcessorStep(ProcessorStep):
     se3_pose_groups: list[list[int]] = field(default_factory=list)
     _last_state: torch.Tensor | None = field(default=None, init=False, repr=False)
     _count_queued_actions: Callable[[], int] | None = field(default=None, init=False, repr=False)
+
+    @classmethod
+    def from_config(
+        cls, config: RelativeActionsConfigMixin, action_names: list[str] | None = None
+    ) -> "RelativeActionsProcessorStep":
+        """Build the step from a policy config, the one place its fields are mapped.
+
+        ``action_names`` overrides ``config.action_feature_names`` for policies that resolve
+        them elsewhere (GR00T reads them from the dataset metadata).
+        """
+        return cls(
+            enabled=config.use_relative_actions,
+            exclude_joints=list(config.relative_exclude_joints),
+            action_names=config.action_feature_names if action_names is None else action_names,
+            se3_pose_groups=[list(group) for group in config.relative_se3_pose_groups],
+        )
 
     def _build_mask(self, action_dim: int) -> list[bool]:
         if not self.exclude_joints or self.action_names is None:

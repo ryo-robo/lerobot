@@ -52,7 +52,6 @@ class RelativeActionsConfigMixin:
     relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
     # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
     # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
-    # Populated at runtime from the dataset's `meta/info.json` declaration by `make_policy`.
     relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
     # Dataset action dimension names. Populated at runtime from dataset metadata by `make_policy`.
     action_feature_names: list[str] | None = None

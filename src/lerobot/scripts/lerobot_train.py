@@ -59,7 +59,7 @@ from lerobot.common.train_utils import (
     update_last_checkpoint,
 )
 from lerobot.common.wandb_utils import WandBLogger
-from lerobot.configs import EvalConfig, JobConfig, parser
+from lerobot.configs import EvalConfig, JobConfig, RelativeActionsConfigMixin, parser
 from lerobot.configs.rewards import RewardModelConfig
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.datasets import (
@@ -81,6 +81,7 @@ from lerobot.jobs import submit_to_hf
 from lerobot.optim.factory import make_optimizer_and_scheduler
 from lerobot.policies import PreTrainedPolicy, make_policy, make_pre_post_processors
 from lerobot.policies.factory import ProcessorConfigKwargs
+from lerobot.processor import RelativeActionsProcessorStep
 from lerobot.processor.rename_processor import rename_batch_keys, rename_stats
 from lerobot.rewards import make_reward_pre_post_processors
 from lerobot.utils.collate import lerobot_collate_fn
@@ -603,12 +604,11 @@ def train(cfg: TrainPipelineConfig) -> None:
         if not cfg.resume:
             preprocessor_overrides["normalizer_processor"]["stats"] = processor_dataset_stats
             postprocessor_overrides["unnormalizer_processor"]["stats"] = processor_dataset_stats
-        if getattr(active_cfg, "use_relative_actions", False):
-            preprocessor_overrides["relative_actions_processor"] = {
-                "enabled": True,
-                "exclude_joints": getattr(active_cfg, "relative_exclude_joints", []),
-                "action_names": getattr(active_cfg, "action_feature_names", None),
-            }
+        if isinstance(active_cfg, RelativeActionsConfigMixin) and active_cfg.use_relative_actions:
+            # Override every field so the active config wins over what the checkpoint saved.
+            preprocessor_overrides["relative_actions_processor"] = RelativeActionsProcessorStep.from_config(
+                active_cfg
+            ).get_config()
             postprocessor_overrides["absolute_actions_processor"] = {"enabled": True}
         processor_kwargs["preprocessor_overrides"] = preprocessor_overrides
         processor_kwargs["postprocessor_overrides"] = postprocessor_overrides

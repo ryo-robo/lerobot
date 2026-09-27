@@ -14,11 +14,13 @@ import torch
 
 pytest.importorskip("datasets", reason="datasets is required (install lerobot[dataset])")
 
+from lerobot.configs import RelativeActionsConfigMixin
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
 from lerobot.datasets.compute_stats import get_feature_stats
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.processor import (
     DataProcessorPipeline,
+    PolicyProcessorPipeline,
     TransitionKey,
     batch_to_transition,
     create_transition,
@@ -391,6 +393,28 @@ def test_cached_anchor_and_queue_binding_not_in_config():
         "action_names",
         "se3_pose_groups",
     }
+
+
+def test_from_config_survives_a_pretrained_processor_override(tmp_path):
+    """Fine-tuning from a checkpoint overrides the saved step with the active policy config.
+
+    Every field has to travel through the override, or the checkpoint's saved value wins silently.
+    """
+    PolicyProcessorPipeline(steps=[RelativeActionsProcessorStep()], name="pre").save_pretrained(tmp_path)
+    config = RelativeActionsConfigMixin(
+        use_relative_actions=True,
+        relative_exclude_joints=["gripper"],
+        relative_se3_pose_groups=[[0, 1, 2, 3, 4, 5]],
+        action_feature_names=["x", "y", "z", "rx", "ry", "rz", "gripper"],
+    )
+    expected = RelativeActionsProcessorStep.from_config(config)
+
+    loaded = PolicyProcessorPipeline.from_pretrained(
+        tmp_path,
+        config_filename="pre.json",
+        overrides={"relative_actions_processor": expected.get_config()},
+    ).steps[0]
+    assert loaded.get_config() == expected.get_config()
 
 
 # --------------------------------------------------------------------------------------

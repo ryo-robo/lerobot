@@ -836,9 +836,9 @@ def _make_relative_action_training_stats_from_dataset_meta(
     )
     return _make_relative_action_training_stats(
         dataset,
-        exclude_joints=list(config.relative_exclude_joints or []),
+        exclude_joints=list(config.relative_exclude_joints),
         action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta),
-        se3_pose_groups=list(config.relative_se3_pose_groups or []),
+        se3_pose_groups=list(config.relative_se3_pose_groups),
         preserve_action_horizon=True,
     )
 
@@ -1245,11 +1245,8 @@ def make_groot_pre_post_processors(
             "OSS-faithful relative normalization, build from a checkpoint without baked-in stats (or "
             "pass dataset_meta) so native relative stats are computed."
         )
-        relative_step = RelativeActionsProcessorStep(
-            enabled=True,
-            exclude_joints=list(config.relative_exclude_joints or []),
-            action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta),
-            se3_pose_groups=list(config.relative_se3_pose_groups or []),
+        relative_step = RelativeActionsProcessorStep.from_config(
+            config, action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta)
         )
         input_steps.insert(2, relative_step)
 

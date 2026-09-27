@@ -124,12 +124,7 @@ def make_pi0_fast_pre_post_processors(
     Returns:
         A tuple containing the configured pre-processor and post-processor pipelines.
     """
-    relative_step = RelativeActionsProcessorStep(
-        enabled=config.use_relative_actions,
-        exclude_joints=getattr(config, "relative_exclude_joints", []),
-        action_names=getattr(config, "action_feature_names", None),
-        se3_pose_groups=getattr(config, "relative_se3_pose_groups", []),
-    )
+    relative_step = RelativeActionsProcessorStep.from_config(config)
 
     steps = make_default_policy_processor_steps(config, dataset_stats)
 
