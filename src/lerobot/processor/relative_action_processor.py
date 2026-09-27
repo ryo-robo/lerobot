@@ -265,6 +265,14 @@ class RelativeActionsProcessorStep(ProcessorStep):
 
         return mask
 
+    def to_relative(self, action: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
+        """Apply this step's mask and SE(3) pose groups to express ``action`` relative to ``state``."""
+        return to_relative_actions(action, state, self._build_mask(action.shape[-1]), self.se3_pose_groups)
+
+    def to_absolute(self, action: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
+        """Invert :meth:`to_relative`, turning ``action`` back into absolute values."""
+        return to_absolute_actions(action, state, self._build_mask(action.shape[-1]), self.se3_pose_groups)
+
     def __call__(self, transition: EnvTransition) -> EnvTransition:
         observation = transition.get(TransitionKey.OBSERVATION, {})
         state = observation.get(OBS_STATE) if observation else None
@@ -285,8 +293,7 @@ class RelativeActionsProcessorStep(ProcessorStep):
         if not isinstance(action, torch.Tensor):
             raise ValueError(f"RelativeActionsProcessorStep expects a tensor action, got {type(action)}")
 
-        mask = self._build_mask(action.shape[-1])
-        new_transition[TransitionKey.ACTION] = to_relative_actions(action, state, mask, self.se3_pose_groups)
+        new_transition[TransitionKey.ACTION] = self.to_relative(action, state)
         return new_transition
 
     def reset(self) -> None:
@@ -358,10 +365,7 @@ class AbsoluteActionsProcessorStep(ProcessorStep):
         if not isinstance(action, torch.Tensor):
             raise ValueError(f"AbsoluteActionsProcessorStep expects a tensor action, got {type(action)}")
 
-        mask = self.relative_step._build_mask(action.shape[-1])
-        new_transition[TransitionKey.ACTION] = to_absolute_actions(
-            action, cached_state, mask, self.relative_step.se3_pose_groups
-        )
+        new_transition[TransitionKey.ACTION] = self.relative_step.to_absolute(action, cached_state)
         return new_transition
 
     def get_config(self) -> dict[str, Any]:

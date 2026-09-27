@@ -526,6 +526,28 @@ def test_se3_pose_groups_round_trip():
     torch.testing.assert_close(to_absolute_actions(relative, state, mask, se3_pose_groups=groups), actions)
 
 
+def test_processor_steps_apply_se3_pose_groups():
+    """The paired steps route through the step's own groups, so callers never rebuild the mask."""
+    rng = np.random.default_rng(1)
+    actions = torch.tensor(
+        np.concatenate([_random_poses(rng, 2, 5), rng.uniform(0.0, 1.0, (2, 5, 1))], -1), dtype=torch.float64
+    )
+    state = torch.tensor(
+        np.concatenate([_random_poses(rng, 2), rng.uniform(0.0, 1.0, (2, 1))], -1), dtype=torch.float64
+    )
+    groups = [[0, 1, 2, 3, 4, 5]]
+    relative_step = RelativeActionsProcessorStep(enabled=True, se3_pose_groups=groups)
+    absolute_step = AbsoluteActionsProcessorStep(enabled=True, relative_step=relative_step)
+
+    relative = relative_step(create_transition(observation={OBS_STATE: state}, action=actions))
+    torch.testing.assert_close(
+        relative[TransitionKey.ACTION],
+        to_relative_actions(actions, state, [True] * 7, se3_pose_groups=groups),
+    )
+    recovered = absolute_step(create_transition(action=relative[TransitionKey.ACTION]))
+    torch.testing.assert_close(recovered[TransitionKey.ACTION], actions)
+
+
 def test_se3_rotation_matches_proper_composition():
     """The relative rotation must be `inv(R_state) @ R_action`, not a component difference."""
     rng = np.random.default_rng(2)

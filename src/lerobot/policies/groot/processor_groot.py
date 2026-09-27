@@ -63,7 +63,6 @@ from lerobot.processor import (
     RenameObservationsProcessorStep,
     load_pretrained_policy_processors,
     policy_action_to_transition,
-    to_relative_actions,
     transition_to_policy_action,
 )
 from lerobot.utils.constants import (
@@ -758,12 +757,7 @@ def _make_relative_action_training_stats(
                     f"({action_batch.shape[0]} vs {state_batch.shape[0]})."
                 )
 
-        relative_action = to_relative_actions(
-            action_batch,
-            state_batch,
-            relative_step._build_mask(action_batch.shape[-1]),
-            relative_step.se3_pose_groups,
-        )
+        relative_action = relative_step.to_relative(action_batch, state_batch)
         if not preserve_action_horizon:
             relative_action = relative_action.reshape(-1, relative_action.shape[-1]).unsqueeze(0)
             pad_mask = None
