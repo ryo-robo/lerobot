@@ -146,12 +146,7 @@ def make_flux3_pre_post_processors(
             output_steps=[unnormalizer, steps.to_cpu],
         )
         return connect_history_processors(config, pre, post)
-    relative_step = RelativeActionsProcessorStep(
-        enabled=config.use_relative_actions,
-        exclude_joints=list(config.relative_exclude_joints),
-        action_names=config.action_feature_names,
-        se3_pose_groups=list(config.relative_se3_pose_groups),
-    )
+    relative_step = RelativeActionsProcessorStep.from_config(config)
     input_steps: list[ProcessorStep] = [
         steps.rename_observations,
         steps.add_batch_dim,

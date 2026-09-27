@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from lerobot.configs.policies import PreTrainedConfig
+from lerobot.configs.policies import PreTrainedConfig, RelativeActionsConfigMixin
 from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
 from lerobot.optim.optimizers import AdamWConfig
 from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @PreTrainedConfig.register_subclass("vla_jepa")
 @dataclass
-class VLAJEPAConfig(PreTrainedConfig):
+class VLAJEPAConfig(RelativeActionsConfigMixin, PreTrainedConfig):
     n_obs_steps: int = 1
     chunk_size: int = 7
     n_action_steps: int = 7
@@ -60,18 +60,6 @@ class VLAJEPAConfig(PreTrainedConfig):
 
     action_dim: int = 7
     state_dim: int = 8
-
-    # Relative actions: converts absolute actions to relative (action -= state) during
-    # preprocessing, and reverses it at postprocessing. Requires `state_dim` (OBS_STATE).
-    use_relative_actions: bool = False
-    # Joint names to keep absolute (not converted to relative). Empty list = all dims relative.
-    relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
-
-    # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
-    # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
-    relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
-    # Populated at runtime from dataset metadata by make_policy (used to build the exclude mask).
-    action_feature_names: list[str] | None = None
 
     num_action_tokens_per_timestep: int = 8
     num_embodied_action_tokens_per_instruction: int = 32

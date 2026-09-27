@@ -19,7 +19,13 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lerobot.configs import FeatureType, NormalizationMode, PolicyFeature, PreTrainedConfig
+from lerobot.configs import (
+    FeatureType,
+    NormalizationMode,
+    PolicyFeature,
+    PreTrainedConfig,
+    RelativeActionsConfigMixin,
+)
 from lerobot.optim import AdamWConfig, DiffuserSchedulerConfig
 from lerobot.utils.constants import ACTION, OBS_STATE
 
@@ -240,7 +246,7 @@ def _infer_groot_model_version_from_config(config: dict) -> str | None:
 
 @PreTrainedConfig.register_subclass("groot")
 @dataclass
-class GrootConfig(PreTrainedConfig):
+class GrootConfig(RelativeActionsConfigMixin, PreTrainedConfig):
     """Configuration for Groot policy wrapper."""
 
     # Basic policy settings
@@ -325,19 +331,9 @@ class GrootConfig(PreTrainedConfig):
     # Set to True only after installing a flash-attn build matching your torch/CUDA env.
     use_flash_attention: bool = False
 
-    # Enable GR00T-style state-relative action chunks (action chunk expressed relative to the current
-    # observation state).
-    use_relative_actions: bool = False
-
-    # relative_exclude_joints names the action dimensions that stay absolute; the
-    # match is substring/case-insensitive against the dataset action feature names. With the empty
-    # default every dimension is treated as relative, including the gripper -- set e.g. ["gripper"] to
-    # keep the gripper absolute, matching the Isaac-GR00T single-arm + absolute-gripper convention.
+    # Isaac-GR00T's single-arm convention keeps the gripper relative too, so unlike the mixin
+    # default, nothing is excluded -- set e.g. ["gripper"] to keep the gripper absolute.
     relative_exclude_joints: list[str] = field(default_factory=list)
-
-    # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
-    # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
-    relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
 
     # Training parameters
     optimizer_lr: float = 1e-4
