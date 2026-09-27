@@ -63,7 +63,6 @@ from lerobot.processor import (
     RenameObservationsProcessorStep,
     load_pretrained_policy_processors,
     policy_action_to_transition,
-    to_relative_actions,
     transition_to_policy_action,
 )
 from lerobot.utils.constants import (
@@ -715,12 +714,20 @@ def _iter_action_state_training_samples(dataset: Any):
         yield item.get(ACTION), item.get(OBS_STATE), item.get(f"{ACTION}_is_pad")
 
 
+def _make_relative_step(config: GrootConfig, dataset_meta: Any | None) -> RelativeActionsProcessorStep:
+    """Build the relative-action step from ``config``; the single place its fields are wired."""
+    return RelativeActionsProcessorStep(
+        enabled=True,
+        exclude_joints=list(config.relative_exclude_joints),
+        action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta),
+        se3_pose_groups=list(config.relative_se3_pose_groups),
+    )
+
+
 def _make_relative_action_training_stats(
     dataset: Any,
+    relative_step: RelativeActionsProcessorStep,
     *,
-    exclude_joints: list[str] | None,
-    action_names: list[str] | None,
-    se3_pose_groups: list[list[int]] | None = None,
     preserve_action_horizon: bool = True,
 ) -> dict[str, dict[str, Any]]:
     try:
@@ -734,12 +741,6 @@ def _make_relative_action_training_stats(
     if dataset_len == 0:
         raise ValueError("Cannot compute relative action statistics for an empty dataset.")
 
-    relative_step = RelativeActionsProcessorStep(
-        enabled=True,
-        exclude_joints=list(exclude_joints or []),
-        action_names=action_names,
-        se3_pose_groups=list(se3_pose_groups or []),
-    )
     stats = deepcopy(getattr(getattr(dataset, "meta", None), "stats", {}) or {})
     chunks_by_horizon: list[list[np.ndarray]] | None = None
     num_vectors = 0
@@ -758,12 +759,7 @@ def _make_relative_action_training_stats(
                     f"({action_batch.shape[0]} vs {state_batch.shape[0]})."
                 )
 
-        relative_action = to_relative_actions(
-            action_batch,
-            state_batch,
-            relative_step._build_mask(action_batch.shape[-1]),
-            relative_step.se3_pose_groups,
-        )
+        relative_action = relative_step.to_relative(action_batch, state_batch)
         if not preserve_action_horizon:
             relative_action = relative_action.reshape(-1, relative_action.shape[-1]).unsqueeze(0)
             pad_mask = None
@@ -835,11 +831,7 @@ def _make_relative_action_training_stats_from_dataset_meta(
         return_uint8=True,
     )
     return _make_relative_action_training_stats(
-        dataset,
-        exclude_joints=list(config.relative_exclude_joints or []),
-        action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta),
-        se3_pose_groups=list(config.relative_se3_pose_groups or []),
-        preserve_action_horizon=True,
+        dataset, _make_relative_step(config, dataset_meta), preserve_action_horizon=True
     )
 
 
@@ -1245,12 +1237,7 @@ def make_groot_pre_post_processors(
             "OSS-faithful relative normalization, build from a checkpoint without baked-in stats (or "
             "pass dataset_meta) so native relative stats are computed."
         )
-        relative_step = RelativeActionsProcessorStep(
-            enabled=True,
-            exclude_joints=list(config.relative_exclude_joints or []),
-            action_names=_resolve_action_feature_names_from_dataset_meta(dataset_meta),
-            se3_pose_groups=list(config.relative_se3_pose_groups or []),
-        )
+        relative_step = _make_relative_step(config, dataset_meta)
         input_steps.insert(2, relative_step)
 
     if checkpoint_assets is not None and not checkpoint_has_stats and not has_modality_stats(padded_stats):

@@ -25,7 +25,6 @@ from lerobot.processor import (
     RelativeActionsProcessorStep,
     TransitionKey,
     create_transition,
-    to_relative_actions,
 )
 
 
@@ -48,8 +47,7 @@ def reanchor_relative_rtc_prefix(
         state = state.unsqueeze(0)
 
     action_cpu = prev_actions_absolute.detach().cpu()
-    mask = relative_step._build_mask(action_cpu.shape[-1])
-    relative_actions = to_relative_actions(action_cpu, state, mask)
+    relative_actions = relative_step.to_relative(action_cpu, state)
 
     transition = create_transition(action=relative_actions)
     if normalizer_step is not None:

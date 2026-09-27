@@ -23,7 +23,6 @@ import torch
 
 from lerobot.configs import is_depth_map
 from lerobot.processor import RelativeActionsProcessorStep
-from lerobot.processor.relative_action_processor import to_relative_actions
 from lerobot.utils.constants import ACTION, OBS_STATE
 
 from .io_utils import load_image_as_numpy
@@ -689,14 +688,13 @@ def _compute_relative_chunk_batch(
     all_actions: np.ndarray,
     all_states: np.ndarray,
     chunk_size: int,
-    relative_mask: np.ndarray,
-    se3_pose_groups: Sequence[Sequence[int]] | None = None,
+    relative_step: RelativeActionsProcessorStep,
 ) -> np.ndarray:
     """Vectorised relative-action computation for a batch of start indices.
 
     Returns an ``(N * chunk_size, action_dim)`` float32 array.
 
-    Delegates to ``to_relative_actions`` so these statistics describe exactly the values the
+    Delegates to ``relative_step`` so these statistics describe exactly the values the
     normalizer will see at train time -- in particular, pose groups are composed in SE(3)
     rather than subtracted.
     """
@@ -706,8 +704,7 @@ def _compute_relative_chunk_batch(
     frame_idx = start_indices[:, None] + offsets[None, :]
     chunks = torch.from_numpy(all_actions[frame_idx])
     states = torch.from_numpy(all_states[start_indices])
-    mask = [bool(flag) for flag in relative_mask]
-    relative = to_relative_actions(chunks, states, mask, se3_pose_groups)
+    relative = relative_step.to_relative(chunks, states)
     return relative.reshape(-1, all_actions.shape[1]).numpy()
 
 
@@ -734,8 +731,10 @@ def compute_relative_action_stats(
         exclude_joints: Joint names whose dimensions should remain absolute
             (not converted to relative actions).
         num_workers: Number of parallel threads for computation. Values ≤1
-            mean single-threaded. Numpy releases the GIL so threads give
+            mean single-threaded. Torch releases the GIL so threads give
             real parallelism here.
+        se3_pose_groups: Action index groups ``[x, y, z, rx, ry, rz]`` composed in SE(3)
+            instead of subtracted. Must match ``policy.relative_se3_pose_groups``.
 
     Returns:
         Statistics dict with keys "mean", "std", "min", "max", "q01", …, "q99".
@@ -749,12 +748,13 @@ def compute_relative_action_stats(
 
     action_dim = features[ACTION]["shape"][0]
     action_names = features.get(ACTION, {}).get("names")
-    mask_step = RelativeActionsProcessorStep(
+    relative_step = RelativeActionsProcessorStep(
         enabled=True,
         exclude_joints=exclude_joints,
         action_names=action_names,
+        se3_pose_groups=[list(group) for group in se3_pose_groups or []],
     )
-    relative_mask = np.array(mask_step._build_mask(action_dim), dtype=np.float32)
+    num_relative_dims = sum(relative_step._build_mask(action_dim))
 
     logger.info("Loading action/state data for relative action stats...")
     all_actions = np.array(hf_dataset[ACTION], dtype=np.float32)
@@ -789,8 +789,7 @@ def compute_relative_action_stats(
                     all_actions,
                     all_states,
                     chunk_size,
-                    relative_mask,
-                    se3_pose_groups,
+                    relative_step,
                 )
                 for batch in batches
             ]
@@ -799,18 +798,16 @@ def compute_relative_action_stats(
     else:
         for batch in batches:
             running_stats.update(
-                _compute_relative_chunk_batch(
-                    batch, all_actions, all_states, chunk_size, relative_mask, se3_pose_groups
-                )
+                _compute_relative_chunk_batch(batch, all_actions, all_states, chunk_size, relative_step)
             )
 
     stats = running_stats.get_statistics()
 
-    excluded_dims = int(len(relative_mask) - relative_mask.sum())
+    excluded_dims = action_dim - num_relative_dims
     total_frames = len(valid_starts) * chunk_size
     logger.info(
         f"Relative action stats ({len(valid_starts)} chunks, {total_frames} frames): "
-        f"relative_dims={int(relative_mask.sum())}/{len(relative_mask)} (excluded={excluded_dims}), "
+        f"relative_dims={num_relative_dims}/{action_dim} (excluded={excluded_dims}), "
         f"mean={np.abs(stats['mean']).mean():.4f}, std={stats['std'].mean():.4f}, "
         f"q01={stats['q01'].mean():.4f}, q99={stats['q99'].mean():.4f}"
     )

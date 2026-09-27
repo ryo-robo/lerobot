@@ -2186,8 +2186,7 @@ def test_groot_n1_7_relative_action_training_processors_save_native_grouped_stat
 
     relative_dataset_stats = _make_relative_action_training_stats(
         _RelativeStatsDataset(),
-        exclude_joints=["gripper"],
-        action_names=action_names,
+        RelativeActionsProcessorStep(enabled=True, exclude_joints=["gripper"], action_names=action_names),
         preserve_action_horizon=True,
     )
     expected_relative_action_min_prefix = torch.tensor(
@@ -2438,8 +2437,7 @@ def test_groot_n1_7_generated_relative_stats_match_oss_gr00t_reference_numbers()
 
     relative_dataset_stats = _make_relative_action_training_stats(
         _Dataset(),
-        exclude_joints=["gripper"],
-        action_names=action_names,
+        RelativeActionsProcessorStep(enabled=True, exclude_joints=["gripper"], action_names=action_names),
         preserve_action_horizon=True,
     )
 
@@ -2573,8 +2571,7 @@ def test_groot_n1_7_relative_action_stats_skip_padded_tail_chunks():
 
     relative_dataset_stats = _make_relative_action_training_stats(
         _Dataset(),
-        exclude_joints=[],
-        action_names=None,
+        RelativeActionsProcessorStep(enabled=True, exclude_joints=[], action_names=None),
         preserve_action_horizon=True,
     )
 

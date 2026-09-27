@@ -454,6 +454,27 @@ class TestRTCReanchoringWithStateNormalizer:
         expected = normalizer(create_transition(action=expected_relative))[TransitionKey.ACTION]
         torch.testing.assert_close(result, expected, atol=1e-5, rtol=1e-5)
 
+    def test_reanchor_applies_se3_pose_groups(self):
+        """The RTC prefix is re-expressed with the step's SE(3) groups, matching what the policy trained on."""
+        groups = [[0, 1, 2, 3, 4, 5]]
+        relative_step = RelativeActionsProcessorStep(enabled=True, se3_pose_groups=groups)
+        state = torch.tensor([[0.1, 0.2, 0.3, 0.4, -0.2, 0.9]])
+        prev_actions_absolute = torch.tensor([[0.5, -0.1, 0.2, -0.3, 0.6, 0.1]] * 5)
+
+        result = reanchor_relative_rtc_prefix(
+            prev_actions_absolute=prev_actions_absolute,
+            current_state=state,
+            relative_step=relative_step,
+            normalizer_step=None,
+            policy_device="cpu",
+        )
+
+        expected = to_relative_actions(
+            prev_actions_absolute, state, [True] * ACTION_DIM, se3_pose_groups=groups
+        )
+        torch.testing.assert_close(result, expected)
+        assert not torch.allclose(result, prev_actions_absolute - state)
+
     def test_reanchor_with_normalized_state_produces_wrong_result(self):
         """Reanchoring with raw vs. normalized state produces meaningfully different outputs."""
         relative_step, normalizer = self._build_normalizer_with_state_stats()
