@@ -23,7 +23,7 @@ Import them directly: ``from lerobot.configs.train import TrainPipelineConfig``
 
 from .dataset import DatasetRecordConfig
 from .default import DatasetConfig, EMAConfig, EvalConfig, JobConfig, PeftConfig, WandBConfig
-from .policies import PreTrainedConfig
+from .policies import PreTrainedConfig, RelativeActionsConfigMixin
 from .types import (
     FeatureType,
     NormalizationMode,
@@ -62,6 +62,7 @@ __all__ = [
     "JobConfig",
     "PeftConfig",
     "PreTrainedConfig",
+    "RelativeActionsConfigMixin",
     "WandBConfig",
     "VideoEncoderConfig",
     "RGBEncoderConfig",

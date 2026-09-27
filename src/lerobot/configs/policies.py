@@ -38,6 +38,27 @@ logger = getLogger(__name__)
 
 
 @dataclass
+class RelativeActionsConfigMixin:
+    """The knobs of `RelativeActionsProcessorStep`, shared by every policy that supports it.
+
+    Inherit alongside `PreTrainedConfig`. A policy may override a default -- GR00T keeps
+    `relative_exclude_joints` empty to match the Isaac-GR00T absolute-gripper convention.
+    """
+
+    # Express the action chunk relative to the observation state at inference time.
+    use_relative_actions: bool = False
+    # Action dimensions that stay absolute; matched substring/case-insensitively against
+    # `action_feature_names`.
+    relative_exclude_joints: list[str] = field(default_factory=lambda: ["gripper"])
+    # Action index groups of end-effector poses, composed in SE(3) instead of subtracted.
+    # See `RelativeActionsProcessorStep`. Empty leaves every dimension component-wise.
+    # Populated at runtime from the dataset's `meta/info.json` declaration by `make_policy`.
+    relative_se3_pose_groups: list[list[int]] = field(default_factory=list)
+    # Dataset action dimension names. Populated at runtime from dataset metadata by `make_policy`.
+    action_feature_names: list[str] | None = None
+
+
+@dataclass
 class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
     """
     Base configuration class for policy models.
